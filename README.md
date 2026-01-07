@@ -25,14 +25,7 @@ Sistema integral de gestión para restaurantes con roles para Gerente, Meseros y
 
 ## 🚀 Instalación
 
-### 1. Descomprimir el proyecto
-
-```bash
-tar -xzf app-restaurante.tar.gz
-cd app-restaurante
-```
-
-### 2. Crear entorno virtual (recomendado)
+### 1. Crear entorno virtual (recomendado)
 
 ```bash
 # Crear entorno virtual
@@ -45,32 +38,16 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-### 3. Instalar dependencias
+### 2. Instalar dependencias
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configurar variables de entorno
+### 4. Ejecutar la aplicación
 
 ```bash
-# Copiar el archivo de ejemplo
-cp .env.example .env
-
-# Editar .env con tus credenciales de Supabase
-# SUPABASE_URL=tu_url_de_supabase
-# SUPABASE_KEY=tu_key_de_supabase
-```
-
-Para obtener tus credenciales de Supabase:
-1. Ve a tu proyecto en https://supabase.com/dashboard
-2. Settings → API
-3. Copia "Project URL" y "anon/public key"
-
-### 5. Ejecutar la aplicación
-
-```bash
-streamlit run Home.py
+python -m streamlit run Home.py
 ```
 
 La aplicación se abrirá en http://localhost:8501
