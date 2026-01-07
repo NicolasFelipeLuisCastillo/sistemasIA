@@ -5,6 +5,23 @@ from components.sidebar import render_sidebar
 from datetime import datetime
 import json
 
+# Ocultar el menú de páginas automático de Streamlit
+st.set_page_config(
+    page_title="Nombre de la Página",
+    page_icon="🍽️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# IMPORTANTE: Ocultar el menú de navegación automático
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.set_page_config(
     page_title="Nuevo Pedido",
     page_icon="➕",
@@ -188,15 +205,27 @@ with col_carrito:
                         'estado': 'pendiente',
                         'items': json.dumps(st.session_state.carrito),
                         'total': total,
-                        'notas': notas_pedido if notas_pedido else None,
-                        'created_at': datetime.now().isoformat()
+                        'notas': notas_pedido if notas_pedido else None
                     }
                     
-                    response = supabase.table('menu').select('*').eq('activo', True).order('categoria').order('nombre').execute()
+                    response = supabase.table('pedidos').insert(pedido_data).execute()
                     
                     if response.data:
-                        numero_pedido = response.data[0]['numero_pedido']
-                        st.success(f"✅ Pedido #{numero_pedido} enviado a cocina!")
+                        # Obtener el ID del pedido insertado
+                        pedido_id = response.data[0].get('id')
+                        
+                        # Obtener el pedido completo con numero_pedido
+                        pedido_completo = supabase.table('pedidos')\
+                            .select('numero_pedido')\
+                            .eq('id', pedido_id)\
+                            .execute()
+                        
+                        if pedido_completo.data:
+                            numero_pedido = pedido_completo.data[0].get('numero_pedido', 'N/A')
+                            st.success(f"✅ Pedido #{numero_pedido} enviado a cocina!")
+                        else:
+                            st.success("✅ Pedido enviado a cocina!")
+                        
                         st.balloons()
                         
                         # Limpiar carrito
@@ -211,6 +240,8 @@ with col_carrito:
                         
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
     else:
         st.info("🛒 El carrito está vacío")
         st.caption("Agrega platos del menú para crear un pedido")

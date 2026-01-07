@@ -1,0 +1,29 @@
+-- Configuración las RLS correctamente, por ahora se inhabilitó la seguridad. Mientras el desarrollo
+
+-- Activar RLS
+ALTER TABLE turnos ENABLE ROW LEVEL SECURITY;
+
+-- Política: Los meseros solo ven sus propios turnos
+CREATE POLICY "meseros_ven_sus_turnos" 
+ON turnos FOR SELECT 
+USING (mesero_id = auth.uid());
+
+-- Política: Los meseros pueden insertar sus propios turnos
+CREATE POLICY "meseros_crean_sus_turnos" 
+ON turnos FOR INSERT 
+WITH CHECK (mesero_id = auth.uid());
+
+-- Política: Los meseros pueden actualizar sus propios turnos
+CREATE POLICY "meseros_actualizan_sus_turnos" 
+ON turnos FOR UPDATE 
+USING (mesero_id = auth.uid());
+
+-- Política: Los gerentes ven todos los turnos
+CREATE POLICY "gerentes_ven_todos_turnos" 
+ON turnos FOR ALL 
+USING (
+  EXISTS (
+    SELECT 1 FROM usuarios 
+    WHERE id = auth.uid() AND rol = 'gerente'
+  )
+);
