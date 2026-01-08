@@ -5,11 +5,61 @@ from components.sidebar import render_sidebar
 from datetime import datetime
 import json
 
+# Ocultar el menú de páginas automático de Streamlit
+st.set_page_config(
+    page_title="Nombre de la Página",
+    page_icon="🍽️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# IMPORTANTE: Ocultar el menú de navegación automático
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.set_page_config(
     page_title="Nuevo Pedido",
     page_icon="➕",
     layout="wide"
 )
+
+def tiene_turno_activo():
+    """Verificar si el mesero tiene un turno activo hoy"""
+    try:
+        from datetime import date
+        response = supabase.table('turnos')\
+            .select('*')\
+            .eq('mesero_id', get_user_id())\
+            .eq('fecha', date.today().isoformat())\
+            .eq('estado', 'activo')\
+            .execute()
+        
+        return response.data and len(response.data) > 0
+    except Exception as e:
+        st.error(f"Error al verificar turno: {str(e)}")
+        return False
+
+# Verificar turno antes de mostrar la página
+if not tiene_turno_activo():
+    st.warning("⚠️ Debes iniciar tu turno antes de crear pedidos")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.info("👉 Ve a **Mi Turno** para registrar tu entrada")
+        
+        if st.button("🕐 Ir a Mi Turno", use_container_width=True, type="primary"):
+            st.switch_page("pages/Mi_Turno.py")
+    
+    st.stop()  # Detener ejecución aquí
+
+# Inicializar carrito en session state
+if 'carrito' not in st.session_state:
+    st.session_state.carrito = []
 
 # Verificar autenticación y rol
 check_auth()
@@ -182,21 +232,34 @@ with col_carrito:
             if st.button("✅ Enviar a Cocina", use_container_width=True, type="primary"):
                 try:
                     # Crear pedido en la base de datos
+
                     pedido_data = {
                         'mesa_id': mesa,
                         'mesero_id': get_user_id(),
                         'estado': 'pendiente',
-                        'items': json.dumps(st.session_state.carrito),
+                        'items': json.dumps(st.session_state.carrito),  # ← Convertir a JSON string
                         'total': total,
-                        'notas': notas_pedido if notas_pedido else None,
-                        'created_at': datetime.now().isoformat()
-                    }
+                        'notas': notas_pedido if notas_pedido else None
+}
                     
-                    response = supabase.table('menu').select('*').eq('activo', True).order('categoria').order('nombre').execute()
+                    response = supabase.table('pedidos').insert(pedido_data).execute()
                     
                     if response.data:
-                        numero_pedido = response.data[0]['numero_pedido']
-                        st.success(f"✅ Pedido #{numero_pedido} enviado a cocina!")
+                        # Obtener el ID del pedido insertado
+                        pedido_id = response.data[0].get('id')
+                        
+                        # Obtener el pedido completo con numero_pedido
+                        pedido_completo = supabase.table('pedidos')\
+                            .select('numero_pedido')\
+                            .eq('id', pedido_id)\
+                            .execute()
+                        
+                        if pedido_completo.data:
+                            numero_pedido = pedido_completo.data[0].get('numero_pedido', 'N/A')
+                            st.success(f"✅ Pedido #{numero_pedido} enviado a cocina!")
+                        else:
+                            st.success("✅ Pedido enviado a cocina!")
+                        
                         st.balloons()
                         
                         # Limpiar carrito
@@ -211,6 +274,8 @@ with col_carrito:
                         
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
     else:
         st.info("🛒 El carrito está vacío")
         st.caption("Agrega platos del menú para crear un pedido")

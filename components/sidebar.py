@@ -3,7 +3,7 @@ from utils.auth import get_user_name, get_user_role, logout
 
 def render_sidebar():
     """Renderizar sidebar con información del usuario y navegación"""
-    
+
     with st.sidebar:
         st.title("🍽️ Restaurante App")
         
@@ -47,8 +47,9 @@ def render_navigation(role: str):
         st.page_link("pages/Dashboard.py", label="📊 Dashboard", icon="📊")
         
     elif role == 'mesero':
-        st.page_link("pages/_Mi_Turno.py", label="🕐 Mi Turno", icon="🕐")
-        st.page_link("pages/Nuevo_Pedido.py", label="➕ Nuevo Pedido", icon="➕")
+        st.page_link("pages/Mi_Turno.py", label="Mi Turno", icon="🕐")
+        st.page_link("pages/Nuevo_Pedido.py", label="Nuevo Pedido", icon="➕")
+        st.page_link("pages/Mis_Pedidos.py", label="Mis Pedidos", icon="📋")
         
     elif role == 'cocinero':
         st.page_link("pages/Pedidos_Pendientes.py", label="📋 Pendientes", icon="📋")

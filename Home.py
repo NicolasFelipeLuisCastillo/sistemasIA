@@ -86,16 +86,7 @@ def show_login():
                         # DEBUG: Ver qué usuarios hay
                         try:
                             st.write("🔍 Verificando conexión a BD...")
-                            
-                            # Prueba 1: Todos los usuarios sin filtro
-                            test_response = supabase.table('usuarios').select('*').execute()
                             st.success("✅ Conexión exitosa a Supabase")
-                            st.write("👥 Total usuarios encontrados:", len(test_response.data) if test_response.data else 0)
-                            st.write("📋 Usuarios completos:", test_response.data)
-                            
-                            # Prueba 2: Solo activos
-                            activos_response = supabase.table('usuarios').select('*').eq('activo', True).execute()
-                            st.write("👥 Usuarios activos:", activos_response.data)
                             
                         except Exception as e:
                             st.error(f"❌ Error conectando a BD: {str(e)}")
