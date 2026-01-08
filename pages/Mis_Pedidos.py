@@ -5,16 +5,6 @@ from components.sidebar import render_sidebar
 from datetime import datetime, date, timedelta
 import json
 
-
-# IMPORTANTE: Ocultar el menú de navegación automático
-st.markdown("""
-<style>
-    [data-testid="stSidebarNav"] {
-        display: none;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 st.set_page_config(
     page_title="Mis Pedidos",
     page_icon="📋",
@@ -60,7 +50,7 @@ if not tiene_turno_activo():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("🕐 Ir a Mi Turno", use_container_width=True, type="primary"):
-            st.switch_page("pages/_Mi_Turno.py")
+            st.switch_page("pages/Mi_Turno.py")
     st.stop()
 
 # ============================================
@@ -85,14 +75,35 @@ with col_actualizar:
     st.write("")  # Espaciado
     st.write("")
     if st.button("🔄 Actualizar", use_container_width=True):
+        st.cache_data.clear()
         st.rerun()
+
+# Botón de debug (puedes quitarlo después)
+with st.expander("🔍 Debug - Ver estado real en BD"):
+    if st.button("Verificar pedidos en base de datos"):
+        try:
+            todos_pedidos = supabase.table('pedidos')\
+                .select('numero_pedido, mesa_id, estado, created_at')\
+                .eq('mesero_id', get_user_id())\
+                .order('created_at', desc=True)\
+                .limit(20)\
+                .execute()
+            
+            if todos_pedidos.data:
+                import pandas as pd
+                df = pd.DataFrame(todos_pedidos.data)
+                st.dataframe(df, use_container_width=True)
+            else:
+                st.info("No hay pedidos")
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
 
 st.divider()
 
 # ============================================
 # OBTENER PEDIDOS
 # ============================================
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=10)  # Cache por solo 10 segundos
 def get_pedidos_mesero(mesero_id, fecha, estado):
     """Obtener pedidos del mesero según filtros"""
     query = supabase.table('pedidos')\
@@ -143,10 +154,13 @@ st.divider()
 # ============================================
 # TABS POR ESTADO
 # ============================================
-tab_activos, tab_listos, tab_entregados, tab_todos = st.tabs([
+pedidos_cancelados = [p for p in pedidos if p['estado'] == 'cancelado']
+
+tab_activos, tab_listos, tab_entregados, tab_cancelados, tab_todos = st.tabs([
     f"🔥 Activos ({len(pedidos_activos)})",
     f"✅ Listos ({len([p for p in pedidos if p['estado'] == 'listo'])})",
     f"📦 Entregados ({len(pedidos_entregados)})",
+    f"❌ Cancelados ({len(pedidos_cancelados)})",
     f"📋 Todos ({len(pedidos)})"
 ])
 
@@ -255,15 +269,228 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                             st.error(f"Error: {str(e)}")
             
             elif pedido['estado'] in ['pendiente', 'en_cocina']:
-                col_info = st.columns([1])[0]
+                # Botones de modificar y eliminar
+                col_info, col_mod, col_del = st.columns([2, 1, 1])
+                
                 with col_info:
                     if pedido['estado'] == 'pendiente':
                         st.info("⏳ Esperando que cocina tome el pedido...")
                     else:
-                        st.info("🔥 El pedido está siendo preparado en cocina...")
+                        st.warning("⚠️ El pedido está en cocina. Modificar con precaución.")
+                
+                with col_mod:
+                    if st.button(
+                        "✏️ Modificar",
+                        key=f"mod_{pedido['id']}",
+                        use_container_width=True
+                    ):
+                        st.session_state[f'modificando_{pedido["id"]}'] = True
+                        st.rerun()
+                
+                with col_del:
+                    if st.button(
+                        "🗑️ Eliminar",
+                        key=f"del_{pedido['id']}",
+                        use_container_width=True,
+                        type="secondary"
+                    ):
+                        st.session_state[f'confirmando_eliminar_{pedido["id"]}'] = True
+                        st.rerun()
+                
+                # Modal de modificación
+                if st.session_state.get(f'modificando_{pedido["id"]}', False):
+                    st.markdown("---")
+                    st.markdown("### ✏️ Modificar Pedido")
+                    
+                    with st.form(key=f"form_mod_{pedido['id']}"):
+                        # Cambiar mesa
+                        nueva_mesa = st.number_input(
+                            "Número de Mesa",
+                            min_value=1,
+                            max_value=100,
+                            value=pedido['mesa_id'],
+                            key=f"mesa_mod_{pedido['id']}"
+                        )
+                        
+                        # Modificar items
+                        st.write("**Items del pedido:**")
+                        items_modificados = []
+                        
+                        for idx, item in enumerate(items):
+                            col_nombre, col_cant, col_eliminar = st.columns([3, 1, 1])
+                            
+                            with col_nombre:
+                                st.write(f"• {item['nombre']}")
+                            
+                            with col_cant:
+                                nueva_cantidad = st.number_input(
+                                    "Cant.",
+                                    min_value=0,
+                                    max_value=50,
+                                    value=item['cantidad'],
+                                    key=f"cant_mod_{pedido['id']}_{idx}",
+                                    label_visibility="collapsed"
+                                )
+                            
+                            with col_eliminar:
+                                mantener = st.checkbox(
+                                    "Mantener",
+                                    value=True,
+                                    key=f"mantener_{pedido['id']}_{idx}",
+                                    label_visibility="collapsed"
+                                )
+                            
+                            if mantener and nueva_cantidad > 0:
+                                item_modificado = item.copy()
+                                item_modificado['cantidad'] = nueva_cantidad
+                                items_modificados.append(item_modificado)
+                        
+                        # Nuevas notas
+                        nuevas_notas = st.text_area(
+                            "Notas del pedido",
+                            value=pedido.get('notas', ''),
+                            key=f"notas_mod_{pedido['id']}"
+                        )
+                        
+                        # Calcular nuevo total
+                        nuevo_total = sum(item['precio'] * item['cantidad'] for item in items_modificados)
+                        st.markdown(f"**Nuevo Total:** ${nuevo_total:,.0f}")
+                        
+                        col_cancelar, col_guardar = st.columns(2)
+                        
+                        with col_cancelar:
+                            cancelar = st.form_submit_button("❌ Cancelar", use_container_width=True)
+                            if cancelar:
+                                st.session_state[f'modificando_{pedido["id"]}'] = False
+                                st.rerun()
+                        
+                        with col_guardar:
+                            guardar = st.form_submit_button("💾 Guardar Cambios", use_container_width=True, type="primary")
+                            
+                            if guardar:
+                                if not items_modificados:
+                                    st.error("❌ Debes mantener al menos un item")
+                                else:
+                                    try:
+                                        supabase.table('pedidos').update({
+                                            'mesa_id': nueva_mesa,
+                                            'items': json.dumps(items_modificados),
+                                            'total': nuevo_total,
+                                            'notas': nuevas_notas if nuevas_notas else None,
+                                            'updated_at': datetime.now().isoformat()
+                                        }).eq('id', pedido['id']).execute()
+                                        
+                                        st.success("✅ Pedido modificado correctamente!")
+                                        st.session_state[f'modificando_{pedido["id"]}'] = False
+                                        st.cache_data.clear()
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Error: {str(e)}")
+                
+                # Modal de confirmación de eliminación
+                if st.session_state.get(f'confirmando_eliminar_{pedido["id"]}', False):
+                    st.markdown("---")
+                    st.warning(f"⚠️ ¿Estás seguro de eliminar el Pedido #{pedido['numero_pedido']}?")
+                    st.caption("Esta acción no se puede deshacer.")
+                    
+                    col_no, col_si = st.columns(2)
+                    
+                    with col_no:
+                        if st.button("❌ No, cancelar", key=f"no_eliminar_{pedido['id']}", use_container_width=True):
+                            st.session_state[f'confirmando_eliminar_{pedido["id"]}'] = False
+                            st.rerun()
+                    
+                    with col_si:
+                        if st.button("✅ Sí, eliminar", key=f"si_eliminar_{pedido['id']}", use_container_width=True, type="primary"):
+                            try:
+                                # Actualizar estado a cancelado
+                                response = supabase.table('pedidos').update({
+                                    'estado': 'cancelado',
+                                    'updated_at': datetime.now().isoformat()
+                                }).eq('id', pedido['id']).execute()
+                                
+                                # Verificar que se actualizó
+                                if response.data:
+                                    st.success("✅ Pedido cancelado correctamente!")
+                                    
+                                    # Limpiar estado
+                                    st.session_state[f'confirmando_eliminar_{pedido["id"]}'] = False
+                                    
+                                    # Limpiar cache
+                                    st.cache_data.clear()
+                                    
+                                    # Forzar actualización inmediata
+                                    import time
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error("❌ No se pudo actualizar el pedido")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ Error al eliminar: {str(e)}")
+                                import traceback
+                                with st.expander("Ver detalles"):
+                                    st.code(traceback.format_exc())
             
             elif pedido['estado'] == 'entregado':
                 st.success(f"✅ Entregado hace {tiempo_mins} minutos")
+            
+            elif pedido['estado'] == 'cancelado':
+                col_msg, col_eliminar_perm = st.columns([2, 1])
+                
+                with col_msg:
+                    st.error(f"❌ Pedido cancelado")
+                
+                with col_eliminar_perm:
+                    if st.button(
+                        "🗑️ Eliminar Permanentemente",
+                        key=f"eliminar_perm_{pedido['id']}",
+                        use_container_width=True,
+                        help="Eliminar completamente de la base de datos"
+                    ):
+                        st.session_state[f'confirmando_eliminar_perm_{pedido["id"]}'] = True
+                        st.rerun()
+                
+                # Confirmación de eliminación permanente
+                if st.session_state.get(f'confirmando_eliminar_perm_{pedido["id"]}', False):
+                    st.markdown("---")
+                    st.error(f"⚠️ ¿ELIMINAR PERMANENTEMENTE el Pedido #{pedido['numero_pedido']}?")
+                    st.warning("Esta acción NO se puede deshacer. El pedido se borrará completamente de la base de datos.")
+                    
+                    col_no, col_si = st.columns(2)
+                    
+                    with col_no:
+                        if st.button("❌ Cancelar", key=f"no_eliminar_perm_{pedido['id']}", use_container_width=True):
+                            st.session_state[f'confirmando_eliminar_perm_{pedido["id"]}'] = False
+                            st.rerun()
+                    
+                    with col_si:
+                        if st.button("⚠️ SÍ, ELIMINAR PERMANENTEMENTE", key=f"si_eliminar_perm_{pedido['id']}", use_container_width=True, type="primary"):
+                            try:
+                                # ELIMINAR de la base de datos (no solo cancelar)
+                                response = supabase.table('pedidos').delete().eq('id', pedido['id']).execute()
+                                
+                                if response:
+                                    st.success("✅ Pedido eliminado permanentemente de la base de datos")
+                                    
+                                    # Limpiar estado
+                                    st.session_state[f'confirmando_eliminar_perm_{pedido["id"]}'] = False
+                                    
+                                    # Limpiar cache
+                                    st.cache_data.clear()
+                                    
+                                    # Recargar
+                                    import time
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error("❌ No se pudo eliminar el pedido")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ Error al eliminar permanentemente: {str(e)}")
+                                import traceback
+                                with st.expander("Ver detalles"):
+                                    st.code(traceback.format_exc())
         
         st.divider()
 
@@ -305,6 +532,65 @@ with tab_entregados:
             renderizar_pedido(pedido, mostrar_acciones=False)
     else:
         st.info("No has entregado pedidos en esta fecha")
+
+# ============================================
+# TAB CANCELADOS
+# ============================================
+with tab_cancelados:
+    if pedidos_cancelados:
+        st.error(f"❌ {len(pedidos_cancelados)} pedido(s) cancelado(s)")
+        
+        # Botón para eliminar todos los cancelados
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🗑️ Eliminar TODOS los Cancelados", use_container_width=True, type="secondary"):
+                st.session_state['confirmando_eliminar_todos'] = True
+                st.rerun()
+        
+        # Confirmación para eliminar todos
+        if st.session_state.get('confirmando_eliminar_todos', False):
+            st.markdown("---")
+            st.error(f"⚠️ ¿ELIMINAR PERMANENTEMENTE los {len(pedidos_cancelados)} pedidos cancelados?")
+            st.warning("Esta acción NO se puede deshacer. Todos los pedidos cancelados se borrarán completamente.")
+            
+            col_no, col_si = st.columns(2)
+            
+            with col_no:
+                if st.button("❌ No, cancelar", key="no_eliminar_todos", use_container_width=True):
+                    st.session_state['confirmando_eliminar_todos'] = False
+                    st.rerun()
+            
+            with col_si:
+                if st.button("⚠️ SÍ, ELIMINAR TODOS", key="si_eliminar_todos", use_container_width=True, type="primary"):
+                    try:
+                        # Obtener IDs de todos los cancelados
+                        ids_cancelados = [p['id'] for p in pedidos_cancelados]
+                        
+                        # Eliminar todos
+                        for pedido_id in ids_cancelados:
+                            supabase.table('pedidos').delete().eq('id', pedido_id).execute()
+                        
+                        st.success(f"✅ {len(ids_cancelados)} pedidos eliminados permanentemente")
+                        
+                        # Limpiar estado
+                        st.session_state['confirmando_eliminar_todos'] = False
+                        
+                        # Limpiar cache y recargar
+                        st.cache_data.clear()
+                        import time
+                        time.sleep(0.5)
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error: {str(e)}")
+        
+        st.divider()
+        
+        # Mostrar pedidos cancelados
+        for pedido in pedidos_cancelados:
+            renderizar_pedido(pedido, mostrar_acciones=True)
+    else:
+        st.success("✨ No hay pedidos cancelados")
 
 # ============================================
 # TAB TODOS
