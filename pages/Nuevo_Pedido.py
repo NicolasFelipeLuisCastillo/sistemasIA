@@ -28,6 +28,39 @@ st.set_page_config(
     layout="wide"
 )
 
+def tiene_turno_activo():
+    """Verificar si el mesero tiene un turno activo hoy"""
+    try:
+        from datetime import date
+        response = supabase.table('turnos')\
+            .select('*')\
+            .eq('mesero_id', get_user_id())\
+            .eq('fecha', date.today().isoformat())\
+            .eq('estado', 'activo')\
+            .execute()
+        
+        return response.data and len(response.data) > 0
+    except Exception as e:
+        st.error(f"Error al verificar turno: {str(e)}")
+        return False
+
+# Verificar turno antes de mostrar la página
+if not tiene_turno_activo():
+    st.warning("⚠️ Debes iniciar tu turno antes de crear pedidos")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.info("👉 Ve a **Mi Turno** para registrar tu entrada")
+        
+        if st.button("🕐 Ir a Mi Turno", use_container_width=True, type="primary"):
+            st.switch_page("pages/Mi_Turno.py")
+    
+    st.stop()  # Detener ejecución aquí
+
+# Inicializar carrito en session state
+if 'carrito' not in st.session_state:
+    st.session_state.carrito = []
+
 # Verificar autenticación y rol
 check_auth()
 require_role(['mesero', 'gerente'])
@@ -199,14 +232,15 @@ with col_carrito:
             if st.button("✅ Enviar a Cocina", use_container_width=True, type="primary"):
                 try:
                     # Crear pedido en la base de datos
+
                     pedido_data = {
                         'mesa_id': mesa,
                         'mesero_id': get_user_id(),
                         'estado': 'pendiente',
-                        'items': json.dumps(st.session_state.carrito),
+                        'items': json.dumps(st.session_state.carrito),  # ← Convertir a JSON string
                         'total': total,
                         'notas': notas_pedido if notas_pedido else None
-                    }
+}
                     
                     response = supabase.table('pedidos').insert(pedido_data).execute()
                     

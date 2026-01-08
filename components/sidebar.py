@@ -49,6 +49,7 @@ def render_navigation(role: str):
     elif role == 'mesero':
         st.page_link("pages/Mi_Turno.py", label="Mi Turno", icon="🕐")
         st.page_link("pages/Nuevo_Pedido.py", label="Nuevo Pedido", icon="➕")
+        st.page_link("pages/Mis_Pedidos.py", label="Mis Pedidos", icon="📋")
         
     elif role == 'cocinero':
         st.page_link("pages/Pedidos_Pendientes.py", label="📋 Pendientes", icon="📋")
