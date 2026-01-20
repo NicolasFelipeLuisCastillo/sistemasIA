@@ -1,10 +1,83 @@
+# ============================================
+# ARCHIVOS DE CONFIGURACIÓN SENSIBLES
+# ============================================
 .env
+.env.local
+.env.production
+.env.development
+*.env
+
+# Credenciales y claves
+secrets.toml
+.streamlit/secrets.toml
+credentials.json
+config.ini
+
+# ============================================
+# PYTHON
+# ============================================
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
-env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
 venv/
+env/
+ENV/
+.venv
+
+# ============================================
+# IDE / EDITORES
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+
+# ============================================
+# STREAMLIT
+# ============================================
 .streamlit/
+*.pyc
+
+# ============================================
+# LOGS Y TEMPORALES
+# ============================================
+*.log
+*.tmp
+*.temp
+logs/
+
+# ============================================
+# BASES DE DATOS LOCALES
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================
+# OTROS
+# ============================================
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
