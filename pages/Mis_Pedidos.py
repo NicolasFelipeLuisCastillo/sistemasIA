@@ -50,7 +50,7 @@ if not tiene_turno_activo():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("🕐 Ir a Mi Turno", use_container_width=True, type="primary"):
-            st.switch_page("pages/Mi_Turno.py")
+            st.switch_page("pages/_Mi_Turno.py")
     st.stop()
 
 # ============================================
@@ -167,8 +167,14 @@ tab_activos, tab_listos, tab_entregados, tab_cancelados, tab_todos = st.tabs([
 # ============================================
 # FUNCIÓN PARA RENDERIZAR PEDIDO
 # ============================================
-def renderizar_pedido(pedido, mostrar_acciones=True):
-    """Renderizar un pedido con su información y acciones"""
+def renderizar_pedido(pedido, mostrar_acciones=True, contexto="general"):
+    """Renderizar un pedido con su información y acciones
+    
+    Args:
+        pedido: Datos del pedido
+        mostrar_acciones: Si mostrar botones de acción
+        contexto: Contexto único para evitar keys duplicadas (ej: "activos", "listos", "entregados")
+    """
     
     # Calcular tiempo transcurrido
     created = datetime.fromisoformat(pedido['created_at'].replace('Z', '+00:00'))
@@ -252,21 +258,32 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                 with col_accion2:
                     if st.button(
                         "✅ Marcar como Entregado",
-                        key=f"entregar_{pedido['id']}",
+                        key=f"{contexto}_{contexto}_entregar_{pedido['id']}",
                         use_container_width=True,
                         type="primary"
                     ):
                         try:
-                            supabase.table('pedidos').update({
+                            # DEBUG: Ver qué estamos enviando
+                            st.write("🔍 DEBUG - Pedido ID:", pedido['id'])
+                            st.write("🔍 DEBUG - Tipo:", type(pedido['id']))
+                            st.write("🔍 DEBUG - Mesero ID:", pedido.get('mesero_id'))
+                            st.write("🔍 DEBUG - Tipo Mesero:", type(pedido.get('mesero_id')))
+                            
+                            # Intentar update
+                            response = supabase.table('pedidos').update({
                                 'estado': 'entregado',
                                 'updated_at': datetime.now().isoformat()
                             }).eq('id', pedido['id']).execute()
+                            
+                            st.write("📥 DEBUG - Respuesta:", response)
                             
                             st.success("✅ Pedido marcado como entregado!")
                             st.cache_data.clear()
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Error: {str(e)}")
+                            st.error(f"❌ Error: {str(e)}")
+                            import traceback
+                            st.code(traceback.format_exc())
             
             elif pedido['estado'] in ['pendiente', 'en_cocina']:
                 # Botones de modificar y eliminar
@@ -281,7 +298,7 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                 with col_mod:
                     if st.button(
                         "✏️ Modificar",
-                        key=f"mod_{pedido['id']}",
+                        key=f"{contexto}_mod_{pedido['id']}",
                         use_container_width=True
                     ):
                         st.session_state[f'modificando_{pedido["id"]}'] = True
@@ -290,7 +307,7 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                 with col_del:
                     if st.button(
                         "🗑️ Eliminar",
-                        key=f"del_{pedido['id']}",
+                        key=f"{contexto}_del_{pedido['id']}",
                         use_container_width=True,
                         type="secondary"
                     ):
@@ -302,14 +319,14 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                     st.markdown("---")
                     st.markdown("### ✏️ Modificar Pedido")
                     
-                    with st.form(key=f"form_mod_{pedido['id']}"):
+                    with st.form(key=f"{contexto}_form_mod_{pedido['id']}"):
                         # Cambiar mesa
                         nueva_mesa = st.number_input(
                             "Número de Mesa",
                             min_value=1,
                             max_value=100,
                             value=pedido['mesa_id'],
-                            key=f"mesa_mod_{pedido['id']}"
+                            key=f"{contexto}_mesa_mod_{pedido['id']}"
                         )
                         
                         # Modificar items
@@ -328,7 +345,7 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                                     min_value=0,
                                     max_value=50,
                                     value=item['cantidad'],
-                                    key=f"cant_mod_{pedido['id']}_{idx}",
+                                    key=f"{contexto}_cant_mod_{pedido['id']}_{idx}",
                                     label_visibility="collapsed"
                                 )
                             
@@ -336,7 +353,7 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                                 mantener = st.checkbox(
                                     "Mantener",
                                     value=True,
-                                    key=f"mantener_{pedido['id']}_{idx}",
+                                    key=f"{contexto}_mantener_{pedido['id']}_{idx}",
                                     label_visibility="collapsed"
                                 )
                             
@@ -349,7 +366,7 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                         nuevas_notas = st.text_area(
                             "Notas del pedido",
                             value=pedido.get('notas', ''),
-                            key=f"notas_mod_{pedido['id']}"
+                            key=f"{contexto}_notas_mod_{pedido['id']}"
                         )
                         
                         # Calcular nuevo total
@@ -396,12 +413,12 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                     col_no, col_si = st.columns(2)
                     
                     with col_no:
-                        if st.button("❌ No, cancelar", key=f"no_eliminar_{pedido['id']}", use_container_width=True):
+                        if st.button("❌ No, cancelar", key=f"{contexto}_no_eliminar_{pedido['id']}", use_container_width=True):
                             st.session_state[f'confirmando_eliminar_{pedido["id"]}'] = False
                             st.rerun()
                     
                     with col_si:
-                        if st.button("✅ Sí, eliminar", key=f"si_eliminar_{pedido['id']}", use_container_width=True, type="primary"):
+                        if st.button("✅ Sí, eliminar", key=f"{contexto}_si_eliminar_{pedido['id']}", use_container_width=True, type="primary"):
                             try:
                                 # Actualizar estado a cancelado
                                 response = supabase.table('pedidos').update({
@@ -444,7 +461,7 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                 with col_eliminar_perm:
                     if st.button(
                         "🗑️ Eliminar Permanentemente",
-                        key=f"eliminar_perm_{pedido['id']}",
+                        key=f"{contexto}_eliminar_perm_{pedido['id']}",
                         use_container_width=True,
                         help="Eliminar completamente de la base de datos"
                     ):
@@ -460,12 +477,12 @@ def renderizar_pedido(pedido, mostrar_acciones=True):
                     col_no, col_si = st.columns(2)
                     
                     with col_no:
-                        if st.button("❌ Cancelar", key=f"no_eliminar_perm_{pedido['id']}", use_container_width=True):
+                        if st.button("❌ Cancelar", key=f"{contexto}_no_eliminar_perm_{pedido['id']}", use_container_width=True):
                             st.session_state[f'confirmando_eliminar_perm_{pedido["id"]}'] = False
                             st.rerun()
                     
                     with col_si:
-                        if st.button("⚠️ SÍ, ELIMINAR PERMANENTEMENTE", key=f"si_eliminar_perm_{pedido['id']}", use_container_width=True, type="primary"):
+                        if st.button("⚠️ SÍ, ELIMINAR PERMANENTEMENTE", key=f"{contexto}_si_eliminar_perm_{pedido['id']}", use_container_width=True, type="primary"):
                             try:
                                 # ELIMINAR de la base de datos (no solo cancelar)
                                 response = supabase.table('pedidos').delete().eq('id', pedido['id']).execute()
@@ -502,7 +519,7 @@ with tab_activos:
         st.info(f"🔥 Tienes {len(pedidos_activos)} pedido(s) activo(s)")
         
         for pedido in pedidos_activos:
-            renderizar_pedido(pedido, mostrar_acciones=True)
+            renderizar_pedido(pedido, mostrar_acciones=True, contexto="activos")
     else:
         st.success("✨ No tienes pedidos activos")
         st.caption("Todos los pedidos han sido completados")
@@ -517,7 +534,7 @@ with tab_listos:
         st.success(f"✅ {len(pedidos_listos)} pedido(s) listo(s) para entregar")
         
         for pedido in pedidos_listos:
-            renderizar_pedido(pedido, mostrar_acciones=True)
+            renderizar_pedido(pedido, mostrar_acciones=True, contexto="listos")
     else:
         st.info("No hay pedidos listos en este momento")
 
@@ -529,7 +546,7 @@ with tab_entregados:
         st.success(f"📦 {len(pedidos_entregados)} pedido(s) entregado(s)")
         
         for pedido in pedidos_entregados:
-            renderizar_pedido(pedido, mostrar_acciones=False)
+            renderizar_pedido(pedido, mostrar_acciones=False, contexto="entregados")
     else:
         st.info("No has entregado pedidos en esta fecha")
 
@@ -588,7 +605,7 @@ with tab_cancelados:
         
         # Mostrar pedidos cancelados
         for pedido in pedidos_cancelados:
-            renderizar_pedido(pedido, mostrar_acciones=True)
+            renderizar_pedido(pedido, mostrar_acciones=True, contexto="cancelados")
     else:
         st.success("✨ No hay pedidos cancelados")
 
@@ -617,7 +634,7 @@ with tab_todos:
         st.divider()
         
         for pedido in pedidos_mostrar:
-            renderizar_pedido(pedido, mostrar_acciones=False)
+            renderizar_pedido(pedido, mostrar_acciones=False, contexto="todos")
     else:
         st.info(f"No hay pedidos para {fecha_filtro.strftime('%d/%m/%Y')}")
         st.caption("Cambia la fecha en el filtro superior para ver pedidos de otros días")
@@ -630,7 +647,7 @@ st.divider()
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     if st.button("➕ Crear Nuevo Pedido", use_container_width=True, type="primary"):
-        st.switch_page("pages/Nuevo_Pedido.py")
+        st.switch_page("pages/_Nuevo_Pedido.py")
 
 # Auto-refresh cada 30 segundos para pedidos activos
 if pedidos_activos:

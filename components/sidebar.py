@@ -54,3 +54,7 @@ def render_navigation(role: str):
     elif role == 'cocinero':
         st.page_link("pages/Pedidos_Pendientes.py", label="📋 Pendientes", icon="📋")
         st.page_link("pages/En_Preparacion.py", label="🔥 En Preparación", icon="🔥")
+    elif role == 'cocinero':
+        st.page_link("pages/Pedidos_Pendientes.py", label="📋 Pendientes", icon="📋")
+        st.page_link("pages/En_Preparacion.py", label="🔥 En Preparación", icon="🔥")
+        st.page_link("pages/Estadisticas_Cocina.py", label="📊 Estadísticas", icon="📊")
