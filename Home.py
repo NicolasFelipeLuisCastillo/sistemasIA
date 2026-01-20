@@ -1,13 +1,32 @@
 import streamlit as st
 from utils.auth import login
-from utils.database import supabase
 
 st.set_page_config(
     page_title="Sistema Restaurante",
     page_icon="🍽️",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed"  # Sidebar colapsado por defecto
 )
+
+# Ocultar sidebar completamente en la página de login
+st.markdown("""
+<style>
+    /* Ocultar sidebar en página de login */
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+    
+    /* Ocultar botón de menú hamburguesa */
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+    
+    /* Ocultar navegación de páginas */
+    [data-testid="stSidebarNav"] {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Inicializar session state
 if 'authenticated' not in st.session_state:
@@ -56,6 +75,7 @@ def show_login():
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
+        st.markdown("<h1 style='text-align: center;'>🍽️</h1>", unsafe_allow_html=True)
         st.markdown("<h2 style='text-align: center;'>Sistema de Restaurante</h2>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; color: gray;'>Gestión integral para tu restaurante</p>", unsafe_allow_html=True)
         
@@ -83,16 +103,6 @@ def show_login():
             if submit:
                 if email and password:
                     with st.spinner("Verificando credenciales..."):
-                        # DEBUG: Ver qué usuarios hay
-                        try:
-                            st.write("🔍 Verificando conexión a BD...")
-                            st.success("✅ Conexión exitosa a Supabase")
-                            
-                        except Exception as e:
-                            st.error(f"❌ Error conectando a BD: {str(e)}")
-                            import traceback
-                            st.code(traceback.format_exc())
-                        
                         user = login(email, password)
                         
                         if user:
@@ -102,9 +112,9 @@ def show_login():
                             st.rerun()
                         else:
                             st.error("❌ Credenciales incorrectas")
-                            st.write("Email ingresado:", email)
-                            st.write("Password ingresado:", password)
-                    
+                else:
+                    st.warning("⚠️ Por favor completa todos los campos")
+        
         st.divider()
         
         # Usuarios de prueba (solo para desarrollo)
@@ -122,7 +132,7 @@ def show_login():
             - Email: `cocinero@test.com`
             - Password: `admin123`
             """)
-
+    
 
 if __name__ == "__main__":
     main()

@@ -35,9 +35,16 @@ def login(email: str, password: str):
         return None
 
 def check_auth():
-    """Verificar si el usuario está autenticado"""
     if 'authenticated' not in st.session_state or not st.session_state.authenticated:
-        st.warning("⚠️ Debes iniciar sesión")
+        st.warning("⚠️ Debes iniciar sesión para acceder a esta página")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.info("🔐 Por favor inicia sesión para continuar")
+            
+            if st.button("🔑 Ir a Iniciar Sesión", use_container_width=True, type="primary"):
+                st.switch_page("Home.py")
+        
         st.stop()
 
 def get_user_role():
